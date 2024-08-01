@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	  <TargetFramework>net8.0</TargetFramework>
+	  <ImplicitUsings>enable</ImplicitUsings>
+	  <Nullable>enable</Nullable>
+	  <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	  <InvariantGlobalization>true</InvariantGlobalization>
+	  <Platforms>x64</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DanilovSoft.Jpegli.Native\DanilovSoft.Jpegli.Native.csproj" />
+  </ItemGroup>
+
+</Project>

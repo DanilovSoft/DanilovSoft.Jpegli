@@ -1,0 +1,21 @@
+﻿namespace DanilovSoft.Jpegli.Native;
+
+internal enum GlobalState
+{
+    Unknown,
+    CSTATE_START = 100,
+    CSTATE_SCANNING = 101,
+    CSTATE_RAW_OK = 102,
+    CSTATE_WRCOEFS = 103,
+    DSTATE_START = 200,
+    DSTATE_INHEADER = 201,
+    DSTATE_READY = 202,
+    DSTATE_PRELOAD = 203,
+    DSTATE_PRESCAN = 204,
+    DSTATE_SCANNING = 205,
+    DSTATE_RAW_OK = 206,
+    DSTATE_BUFIMAGE = 207,
+    DSTATE_BUFPOST = 208,
+    DSTATE_RDCOEFS = 209,
+    DSTATE_STOPPING = 210,
+}

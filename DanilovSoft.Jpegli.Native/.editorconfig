@@ -1,0 +1,20 @@
+# Файлы C#
+[*.cs]
+
+# IDE0007: Использование неявного типа
+csharp_style_var_when_type_is_apparent = false
+
+# IDE0007: Использование неявного типа
+csharp_style_var_for_built_in_types = false
+
+# CA1707: Идентификаторы не должны содержать символы подчеркивания
+dotnet_diagnostic.CA1707.severity = silent
+
+# IDE1006: Стили именования
+dotnet_diagnostic.IDE1006.severity = silent
+
+# CA1815: Переопределите операторы Equals и равенства для типов значений
+dotnet_diagnostic.CA1815.severity = silent
+
+# CA1034: Вложенные типы не должны быть видимыми
+dotnet_diagnostic.CA1034.severity = silent

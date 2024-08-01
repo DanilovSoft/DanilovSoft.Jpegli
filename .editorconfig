@@ -1,0 +1,11 @@
+# Удалите строку ниже, если вы хотите наследовать параметры .editorconfig из каталогов, расположенных выше в иерархии
+root = true
+
+# Файлы C#
+[*.cs]
+
+# IDE0007: Использование неявного типа
+csharp_style_var_when_type_is_apparent = false
+
+# IDE0007: Использование неявного типа
+csharp_style_var_for_built_in_types = false
