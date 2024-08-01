@@ -1,6 +1,6 @@
 ﻿namespace DanilovSoft.Jpegli.Native;
 
-[StructLayout(LayoutKind.Explicit, Pack = 8)]
+[StructLayout(LayoutKind.Explicit, Size = 472 * 2)]
 internal sealed class jpeg_comp_master
 {
     //public IntPtr prepare_for_pass; // void (*prepare_for_pass) (j_compress_ptr cinfo);
@@ -13,12 +13,12 @@ internal sealed class jpeg_comp_master
     //[FieldOffset() MarshalAs(UnmanagedType.I1)]
     //public bool is_last_pass; // boolean is_last_pass;
 
-    [FieldOffset(452)]
-    public float psnr_target;
+    //[FieldOffset(452)]
+    //public float psnr_target;
     
-    [FieldOffset(456)]
-    public float psnr_tolerance;
+    //[FieldOffset(456)]
+    //public float psnr_tolerance;
 
-    [FieldOffset(464)]
-    public float max_distance;
+    //[FieldOffset(464)]
+    //public float max_distance;
 }

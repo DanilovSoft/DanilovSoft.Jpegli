@@ -12,3 +12,5 @@ global using int16_t = System.Int16;
 global using int32_t = System.Int32;
 global using int64_t = System.Int64;
 global using size_t = System.Int64;
+global using unsafe j_compress_ptr = DanilovSoft.Jpegli.Native.jpeg_compress_struct*;
+

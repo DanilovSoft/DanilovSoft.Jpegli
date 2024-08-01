@@ -15,7 +15,7 @@ internal static unsafe partial class Jpeg62
 
     [LibraryImport(NativeLibrary, EntryPoint = "jpeg_CreateCompress")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    public static partial void jpeg_CreateCompress(nint cinfo, int version, nuint structsize);
+    public static partial void jpeg_CreateCompress(j_compress_ptr cinfo, int version, nuint structsize);
 
     //[LibraryImport(NativeLibrary, EntryPoint = "jpeg_std_error")]
     [DllImport(NativeLibrary, CallingConvention = CallingConvention.Cdecl, EntryPoint = "jpeg_std_error")]

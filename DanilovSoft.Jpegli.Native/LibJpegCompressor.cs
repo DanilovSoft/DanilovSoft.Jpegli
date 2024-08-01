@@ -1,7 +1,22 @@
-﻿namespace DanilovSoft.Jpegli.Native;
+﻿using System.Runtime.CompilerServices;
 
-internal sealed class LibJpegCompressor : IDisposable
+namespace DanilovSoft.Jpegli.Native;
+
+internal sealed unsafe class LibJpegCompressor : IDisposable
 {
+#if DEBUG
+    [ModuleInitializer]
+    public static void InitializeModule()
+    {
+        Debug.Assert(Marshal.SizeOf<jpeg_common_struct>() == 40); // 40 for x64
+        Debug.Assert(Marshal.SizeOf<jpeg_error_mgr>() == 168); // 164 абсолют; 168 для x64 (Pack 8)
+        Debug.Assert(Marshal.SizeOf<jpeg_compress_struct>() == 504); // 504 for x64
+    }
+#endif
+
+    private readonly jpeg_error_mgr _errMgr = new();
+    private readonly jpeg_compress_struct _cinfo = new();
+
     public LibJpegCompressor()
     {
 
@@ -11,48 +26,44 @@ internal sealed class LibJpegCompressor : IDisposable
     {
     }
 
-    public void Compress(int quality)
+    public unsafe void Compress(int quality)
     {
-        IntPtr errPtr = JpegStdError();
-        JpegSetDefaults(errPtr);
+        _cinfo.err = JpegStdError();
+        JpegSetDefaults();
     }
 
-    private unsafe IntPtr JpegStdError()
+    private unsafe jpeg_error_mgr* JpegStdError()
     {
-        var err = new jpeg_error_mgr();
-        
-        Debug.Assert(Marshal.SizeOf(err) == 168); // 164 абсолют; 168 для x64 (Pack 8)
-
-        var ptr = Marshal.AllocHGlobal(Marshal.SizeOf(err));
-        Marshal.StructureToPtr(err, ptr, true);
+        var ptr = Marshal.AllocHGlobal(Marshal.SizeOf(_errMgr)); // (!) do not forget to free
+        Marshal.StructureToPtr(_errMgr, ptr, true);
 
         IntPtr ptrRet = Jpeg62.jpeg_std_errorPtr(ptr); // (!) it's actually cals jpegli_std_error
         Debug.Assert(ptrRet == ptr);
 
-        Marshal.PtrToStructure(ptr, err); // копируем значения взад.
+        Marshal.PtrToStructure(ptr, _errMgr); // копируем значения взад.
         
-        Debug.Assert(err.jpeg_message_table != default); // array of string messages
-        Debug.Assert(err.last_jpeg_message == 129); // array size
+        Debug.Assert(_errMgr.jpeg_message_table != default); // array of string messages
+        Debug.Assert(_errMgr.last_jpeg_message == 129); // array size
 
 #if DEBUG
 
-        for (int i = 0; i < err.last_jpeg_message; i++)
+        for (int i = 0; i < _errMgr.last_jpeg_message; i++)
         {
             // Получаем указатель на текущую строку
-            IntPtr stringPtr = Marshal.ReadIntPtr(err.jpeg_message_table, i * IntPtr.Size);
+            IntPtr stringPtr = Marshal.ReadIntPtr(_errMgr.jpeg_message_table, i * IntPtr.Size);
 
             // Преобразуем указатель в строку
             string message = Marshal.PtrToStringAnsi(stringPtr);
 
-            Console.WriteLine("Сообщение {0}: {1}", i, message);
+            Debug.WriteLine($"message_table[{i}]: {message}");
         }
 #endif
 
-        SetErrCallbacks(err);
+        SetErrCallbacks(_errMgr);
 
-        Marshal.StructureToPtr(err, ptr, fDeleteOld: false);
+        Marshal.StructureToPtr(_errMgr, ptr, fDeleteOld: false);
 
-        return ptr;
+        return (jpeg_error_mgr*)ptr.ToPointer();
     }
 
     public static IDisposable Compress(byte[] data, int width, int height, int stride, int quality)
@@ -94,7 +105,7 @@ internal sealed class LibJpegCompressor : IDisposable
         //}
     }
 
-    private void SetErrCallbacks(jpeg_error_mgr err)
+    private unsafe void SetErrCallbacks(jpeg_error_mgr err)
     {
         // колбеки можно переопределять после вызова jpeg_std_error
         err.error_exit = Marshal.GetFunctionPointerForDelegate<jpeg_common_ptr_delegate>(CustomErrorExit);
@@ -104,26 +115,29 @@ internal sealed class LibJpegCompressor : IDisposable
         err.reset_error_mgr = Marshal.GetFunctionPointerForDelegate<jpeg_reset_error_mgr_delegate>(CustomResetErrorMgr);
     }
 
-    private unsafe void JpegSetDefaults(IntPtr errPtr)
+    private unsafe void JpegSetDefaults()
     {
-        //var err = new jpeg_error_mgr();
-        //Jpeg62.jpeg_std_error(err);
-        //Debug.Assert(err.last_jpeg_message == 129);
-        //SetErrCallbacks(err);
+        _cinfo.global_state = GlobalState.CSTATE_START;
+        _cinfo.in_color_space = J_COLOR_SPACE.JCS_RGB; // You must set in_color_space correctly before calling jpeg_set_defaults()
+        _cinfo.master = DebugCreateUnmanaged<jpeg_comp_master>();
+        _cinfo.comp_info = DebugCreateUnmanaged<jpeg_component_info>();
+        _cinfo.dest = DebugCreateUnmanaged<jpeg_destination_mgr>();
 
-        var cinfo = new jpeg_compress_struct
-        {
-            err = errPtr,
-            //global_state = GlobalState.CSTATE_START,
-            in_color_space = J_COLOR_SPACE.JCS_RGB
-        };
+        //_cinfo.quant_tbl_ptrs = [1,2,3,4];
 
-        var cinfoPtr = Marshal.AllocHGlobal(Marshal.SizeOf(cinfo));
-        Marshal.StructureToPtr(cinfo, cinfoPtr, false);
+        var cinfoPtr = Marshal.AllocHGlobal(Marshal.SizeOf(_cinfo));
+        Marshal.StructureToPtr(_cinfo, cinfoPtr, false);
+
+        //_cinfo.quant_tbl_ptrs = [];
+        //Marshal.PtrToStructure(cinfoPtr, _cinfo);
 
         try
         {
-            // You must set in_color_space correctly before calling jpeg_set_defaults()
+            Jpeg62.jpeg_CreateCompress((j_compress_ptr)cinfoPtr.ToPointer(), 62, (nuint)Marshal.SizeOf(_cinfo));
+
+            Marshal.PtrToStructure(cinfoPtr, _cinfo);
+
+
             Jpeg62.jpeg_set_defaults(cinfoPtr);
         }
         catch (Exception ex)
@@ -131,13 +145,24 @@ internal sealed class LibJpegCompressor : IDisposable
         }
     }
 
-    // does not return to caller
-    private void CustomErrorExit(IntPtr cinfo)
+    private static T* DebugCreateUnmanaged<T>() where T : new()
     {
-        var cinfoStruct = Marshal.PtrToStructure<jpeg_compress_struct>(cinfo);
-        var err = Marshal.PtrToStructure<jpeg_error_mgr>(cinfoStruct.err)!;
+        var structure = new T();
 
-        throw new LibJpegException { MsgCode = err.msg_code };
+        var ptr = Marshal.AllocHGlobal(Marshal.SizeOf<T>()); // (!) do not forget to free
+        Marshal.StructureToPtr(structure, ptr, true);
+
+        return (T*)ptr.ToPointer();
+    }
+
+    // does not return to caller
+    private void CustomErrorExit(jpeg_common_struct* cinfo)
+    {
+        Marshal.PtrToStructure((nint)cinfo, _cinfo);
+        Marshal.PtrToStructure((nint)_cinfo.err, _errMgr);
+
+        // TODO можно извлечь сообщение из таблицы!
+        throw new LibJpegException { MsgCode = _errMgr.msg_code };
     }
 
     private void CustomEmitMessage(IntPtr cinfo, int msg_level)

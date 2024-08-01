@@ -1,4 +1,8 @@
-﻿namespace DanilovSoft.Jpegli.Native;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.Marshalling;
+using System.Text;
+
+namespace DanilovSoft.Jpegli.Native;
 
 
 
@@ -54,12 +58,27 @@ public class jpeg_error_mgr
         [FieldOffset(0)]
         //[MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
         //public int[] i;
-        public fixed int i[8];
+        public msg_param_int8 i;
 
         [FieldOffset(0)]
         //[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)]
         //public string s;
-        public fixed byte s[80]; // char*
+        public msg_param_char80 s; // char*
+
+        public readonly string AsText => Encoding.ASCII.GetString(s);
+        public readonly ReadOnlySpan<int> AsIntegers => i;
+    }
+
+    [InlineArray(8)]
+    public struct msg_param_int8
+    {
+        public int Value0;
+    }
+
+    [InlineArray(80)]
+    public struct msg_param_char80
+    {
+        public byte Value0;
     }
 
     public msg_parm_union msg_parm;
