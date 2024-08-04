@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System.Buffers;
+using System.Drawing;
 using System.Drawing.Imaging;
 
 namespace DanilovSoft.Jpegli.Test;
@@ -69,13 +70,18 @@ public sealed partial class JpegliTest
     [InlineData("TestImages//1_webp_ll.png", 80)]
     public void WebPEncodeLossyBGR(string inputFile, int quality)
     {
-        Jpegli.Compress(quality);
+        //var inputFileData = File.ReadAllBytes(inputFile);
+        
 
-        //var inputFileInfo = new FileInfo(inputFile);
-        //var outputFile = Path.GetFileNameWithoutExtension(inputFileInfo.Name) + $"_Q{quality}.jpg";
-        //outputFile = Path.Combine(Path.GetDirectoryName(inputFile)!, outputFile);
+        var inputFileInfo = new FileInfo(inputFile);
+        var outputFile = Path.GetFileNameWithoutExtension(inputFileInfo.Name) + $"_Q{quality}.jpg";
+        outputFile = Path.Combine(Path.GetDirectoryName(inputFile)!, outputFile);
 
-        //var raw = RawFromFile(inputFile);
+        var raw = RawFromFile(inputFile);
+
+        var output = new ArrayBufferWriter<byte>();
+        Jpegli.Compress(raw.Data, raw.Width, raw.Height, raw.Stride, raw.Channel, quality, output);
+        File.WriteAllBytes(outputFile, output.WrittenSpan.ToArray());
 
         //using (var encodedImage = Jpegli.Compress(raw.Data, raw.Width, raw.Height, raw.Stride, quality))
         //{

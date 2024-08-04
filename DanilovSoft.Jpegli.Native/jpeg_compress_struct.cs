@@ -1,5 +1,4 @@
 ﻿#nullable disable
-
 namespace DanilovSoft.Jpegli.Native;
 
 [StructLayout(LayoutKind.Sequential)]
@@ -9,7 +8,13 @@ internal unsafe class jpeg_compress_struct : jpeg_common_struct
 
     public uint image_width; // JDIMENSION
     public uint image_height; // JDIMENSION
+    /// <summary>
+    /// Number of color components per pixel.
+    /// </summary>
     public int input_components;
+    /// <summary>
+    /// Colorspace of input image.
+    /// </summary>
     public J_COLOR_SPACE in_color_space; // J_COLOR_SPACE
 
     public double input_gamma;
@@ -34,7 +39,7 @@ internal unsafe class jpeg_compress_struct : jpeg_common_struct
     public byte[] arith_ac_K = new byte[16]; // UINT8 [NUM_ARITH_TBLS]
 
     public int num_scans;
-    public IntPtr scan_info; // jpeg_scan_info*
+    public jpeg_scan_info* scan_info; // jpeg_scan_info*
 
     [MarshalAs(UnmanagedType.I1)]
     public bool raw_data_in;
@@ -96,4 +101,10 @@ internal unsafe class jpeg_compress_struct : jpeg_common_struct
     public IntPtr entropy; // jpeg_entropy_encoder*
     public IntPtr script_space; // jpeg_scan_info*
     public int script_space_size;
+
+    //[InlineArray(4)]
+    //public struct NUM_QUANT_TBLS
+    //{
+    //    public IntPtr Value0;
+    //}
 }

@@ -3,7 +3,7 @@
   <PropertyGroup>
 	  <TargetFramework>net8.0</TargetFramework>
 	  <ImplicitUsings>enable</ImplicitUsings>
-	  <Nullable>annotations</Nullable>
+	  <Nullable>enable</Nullable>
 	  <AnalysisMode>AllEnabledByDefault</AnalysisMode>
 	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	  <InvariantGlobalization>true</InvariantGlobalization>
@@ -23,6 +23,10 @@
     <None Update="libjpeg\zlib1.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Wrappers\" />
   </ItemGroup>
 
 </Project>
