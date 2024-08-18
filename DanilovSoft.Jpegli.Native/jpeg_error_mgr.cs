@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace DanilovSoft.Jpegli.Native;
 
@@ -10,7 +11,7 @@ internal unsafe class jpeg_error_mgr
     public IntPtr output_message; // void (*output_message) (j_common_ptr cinfo)
     
     [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-    public delegate* unmanaged[Cdecl]<j_common_ptr, byte*, void> format_message;
+    public delegate* unmanaged[Cdecl]<IntPtr, byte*, void> format_message;
 
     public IntPtr reset_error_mgr; // void (*reset_error_mgr) (j_common_ptr cinfo)
     public int msg_code;

@@ -1,5 +1,7 @@
-﻿namespace DanilovSoft.Jpegli.Native;
+﻿using DanilovSoft.Jpegli.Native.Wrappers;
 
-internal sealed class JpegCompressStruct : ManagedPtr<jpeg_compress_struct>
+namespace DanilovSoft.Jpegli.Native;
+
+internal sealed class JpegCompressStruct : PtrOwner<jpeg_compress_struct>
 {
 }

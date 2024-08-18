@@ -9,91 +9,87 @@ internal class Program
 {
     static void Main()
     {
-        //var inputFile = File.ReadAllBytes("TestImages/1_webp_ll.png");
+        const int Quality = 80;
 
-        var bmp = (Bitmap)Image.FromFile("TestImages/gegegekman.jpeg");
-        var rawImage = PrepareRaw(bmp);
+        //var inputFile = File.ReadAllBytes("TestImages/1_webp_ll.png");
+        using var bitmap = (Bitmap)Image.FromFile("TestImages/TJGF_title.jpg");
+
+        var data = bitmap.LockBits(
+            new Rectangle(0, 0, bitmap.Width, bitmap.Height), 
+            ImageLockMode.ReadOnly,
+            bitmap.PixelFormat);
 
         var output = new ArrayBufferWriter<byte>();
-        Jpegli.Compress(rawImage.Data, rawImage.Width, rawImage.Height, rawImage.Stride, rawImage.Channels, 90, output);
+        try
+        {
+            Jpegli.Compress(data.Scan0, data.Stride, data.Width, data.Height, bitmap.PixelFormat, Quality, output);
 
-        File.WriteAllBytes("test.jpg", output.WrittenSpan.ToArray());
+            File.WriteAllBytes($"TestImages/output_MyJpegli_Q{Quality}.jpg", output.WrittenSpan.ToArray());
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
     }
 
-    private static unsafe RawImage PrepareRaw(Bitmap png)
+    private static RawImage PrepareRaw(Bitmap inputFile)
     {
-        // png is Format32bppArgb
-        // In .NET Argb is BGRA
-        var width = png.Width;
-        var height = png.Height;
-        var pixelFormat = png.PixelFormat;
-        var bitmapData = png.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, pixelFormat);
-        var stride = bitmapData.Stride;
-        var channel = Image.GetPixelFormatSize(pixelFormat) / 8;
-        var scanLine = bitmapData.Stride / channel;
+        var width = inputFile.Width;
+        var height = inputFile.Height;
+        var pixelFormat = inputFile.PixelFormat; // png is Format32bppArgb. In .NET Argb is BGRA
+        var bitmapData = inputFile.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, pixelFormat);
+        var stride = bitmapData.Stride; // ширина в байтах
+        var channels = Image.GetPixelFormatSize(pixelFormat) / 8;
+        var scanLine = bitmapData.Stride / channels; // количество пикселей в строке (с заполнением)
         var hasAlpha = Image.IsAlphaPixelFormat(pixelFormat);
 
         ReadOnlySpan<byte> scan0; // размер scan0 = Width * Height * num of Channels
         unsafe
         {
-            scan0 = new ReadOnlySpan<byte>(bitmapData.Scan0.ToPointer(), stride * height * channel);
+            scan0 = new ReadOnlySpan<byte>((void*)bitmapData.Scan0, stride * height * channels);
         }
 
+        //var absoluteSize = width * height * channels;
+
         //_rawImages[Mode.BGR] = ToRawImage(scan0, width, height, stride, scanLine, channel, hasAlpha, destChannel: 3, swapRgb: false, includeAlpha: false);
-        var rawImage = ToRawImage(scan0, width, height, stride, scanLine, channel, hasAlpha, destChannel: 3, swapRgb: true, includeAlpha: false);
+        var rawImage = ToRawImage(scan0, width, height, stride, scanLine, channels, hasAlpha, destChannels: 3, swapRgb: true, includeAlpha: false);
         //_rawImages[Mode.BGRA] = ToRawImage(scan0, width, height, stride, scanLine, channel, hasAlpha, destChannel: 4, swapRgb: false, includeAlpha: true);
         //_rawImages[Mode.RGBA] = ToRawImage(scan0, width, height, stride, scanLine, channel, hasAlpha, destChannel: 4, swapRgb: true, includeAlpha: true);
 
-        png.UnlockBits(bitmapData);
+        inputFile.UnlockBits(bitmapData);
 
         return rawImage;
     }
 
-    private static RawImage ToRawImage(ReadOnlySpan<byte> scan0,
-                                   int width,
-                                   int height,
-                                   int stride,
-                                   int scanLine,
-                                   int channel,
-                                   bool hasAlpha,
-                                   int destChannel,
-                                   bool swapRgb,
-                                   bool includeAlpha)
+    private static RawImage ToRawImage(ReadOnlySpan<byte> scan0, int width, int height, int stride, int scanLine,
+        int channel, bool hasAlpha, int destChannels, bool swapRgb, bool includeAlpha)
     {
-        var targetData = new byte[scanLine * destChannel * height];
+        var targetWidth = scanLine * destChannels;
+        var targetData = new byte[targetWidth * height];
 
-        ToRawImage(scan0, width, height, stride, scanLine, channel, hasAlpha, destChannel, swapRgb, includeAlpha, targetData);
+        ToRawImage(scan0, width, height, stride, scanLine, channel, hasAlpha, destChannels, swapRgb, includeAlpha, targetData);
 
         return new RawImage
         {
             Data = targetData,
             Width = width,
             Height = height,
-            Stride = scanLine * destChannel,
-            Channels = destChannel
+            Stride = scanLine * destChannels,
+            Channels = destChannels
         };
     }
 
-    private static void ToRawImage(ReadOnlySpan<byte> source,
-                                   int width,
-                                   int height,
-                                   int stride,
-                                   int scanLine,
-                                   int channel,
-                                   bool hasAlpha,
-                                   int destChannel,
-                                   bool swapRgb,
-                                   bool includeAlpha,
-                                   Span<byte> target)
+    private static void ToRawImage(
+        ReadOnlySpan<byte> source, int width, int height, int stride, int scanLine, int channel, bool hasAlpha, int destChannel, bool swapRgb, bool includeAlpha, Span<byte> target)
     {
         Debug.Assert(source.Length >= (scanLine * channel * height));
         Debug.Assert(target.Length == (scanLine * destChannel * height));
 
         var destStride = scanLine * destChannel;
 
-        for (var y = 0; y < height; y++)
+        for (var _ = 0; _ < height; _++)
         {
-            for (var x = 0; x < width; x++)
+            for (var __ = 0; __ < width; __++)
             {
                 if (includeAlpha)
                 {

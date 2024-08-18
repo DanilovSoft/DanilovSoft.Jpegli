@@ -1,4 +1,6 @@
-﻿namespace DanilovSoft.Jpegli.Native;
+﻿using System.Runtime.InteropServices;
+
+namespace DanilovSoft.Jpegli.Native;
 
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe class jpeg_destination_mgr

@@ -27,3 +27,9 @@ dotnet_diagnostic.CA2255.severity = silent
 
 # CA1051: Не объявляйте видимые поля экземпляров
 dotnet_diagnostic.CA1051.severity = silent
+
+# IDE0290: Использовать основной конструктор
+csharp_style_prefer_primary_constructors = false
+
+# CA1720: Идентификатор содержит имя типа
+dotnet_diagnostic.CA1720.severity = silent

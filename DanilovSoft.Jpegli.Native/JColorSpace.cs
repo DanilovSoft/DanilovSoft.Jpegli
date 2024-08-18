@@ -1,6 +1,6 @@
 ﻿namespace DanilovSoft.Jpegli.Native;
 
-public enum J_COLOR_SPACE
+public enum J_COLOR_SPACE : int
 {
     JCS_UNKNOWN,            // error/unspecified
     JCS_GRAYSCALE,          // monochrome

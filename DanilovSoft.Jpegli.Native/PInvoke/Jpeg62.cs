@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 
@@ -32,6 +33,10 @@ internal static unsafe partial class Jpeg62
     //public static extern void jpeg_set_defaults([In, Out] jpeg_compress_struct cinfo);
     //public static extern void jpeg_set_defaults(ref jpeg_compress_struct cinfo);
 
+    [LibraryImport(NativeLibrary, EntryPoint = "jpeg_simple_progression")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static partial void jpeg_simple_progression(IntPtr cinfo);
+
     [LibraryImport(NativeLibrary)]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static partial void jpeg_mem_dest(IntPtr cinfo, ref IntPtr outbuffer, ref uint outsize);
@@ -52,7 +57,7 @@ internal static unsafe partial class Jpeg62
     /// <returns>number of scanlines actually written</returns>
     [LibraryImport(NativeLibrary)]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    public static partial int jpeg_write_scanlines(nint cinfo, [In] byte[][] scanlines, int num_lines);
+    public static partial int jpeg_write_scanlines(nint cinfo, ReadOnlySpan<IntPtr> scanlines, int num_lines);
     //public static partial int jpeg_write_scanlines(nint cinfo, [In] byte*[] scanlines, int num_lines);
 
     [DllImport(NativeLibrary, CallingConvention = CallingConvention.Cdecl)]

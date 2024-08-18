@@ -1,6 +1,6 @@
 ﻿//global using System.Diagnostics.CodeAnalysis;
-global using System.Runtime.InteropServices;
-global using System.Runtime.CompilerServices;
+//global using System.Runtime.InteropServices;
+//global using System.Runtime.CompilerServices;
 //global using System.Diagnostics;
 global using DanilovSoft.Jpegli.Native.PInvoke;
 global using DanilovSoft.Jpegli.Native.Exceptions;

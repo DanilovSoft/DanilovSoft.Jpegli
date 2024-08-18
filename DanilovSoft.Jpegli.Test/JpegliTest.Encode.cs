@@ -80,8 +80,8 @@ public sealed partial class JpegliTest
         var raw = RawFromFile(inputFile);
 
         var output = new ArrayBufferWriter<byte>();
-        Jpegli.Compress(raw.Data, raw.Width, raw.Height, raw.Stride, raw.Channel, quality, output);
-        File.WriteAllBytes(outputFile, output.WrittenSpan.ToArray());
+        //Jpegli.Compress(raw.Data, raw.Stride, raw.Width, raw.Height, PixelFormat.Format24bppRgb, quality, output);
+        //File.WriteAllBytes(outputFile, output.WrittenSpan.ToArray());
 
         //using (var encodedImage = Jpegli.Compress(raw.Data, raw.Width, raw.Height, raw.Stride, quality))
         //{

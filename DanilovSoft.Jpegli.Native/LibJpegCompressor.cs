@@ -1,38 +1,27 @@
 ﻿using System.Buffers;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
+using DanilovSoft.Jpegli.Native.InlineArrays;
+using DanilovSoft.Jpegli.Native.Wrappers;
 using static DanilovSoft.Jpegli.Native.PInvoke.Jpeg62;
 
 namespace DanilovSoft.Jpegli.Native;
 
 internal sealed unsafe class LibJpegCompressor : IDisposable
 {
-#if DEBUG
-    [ModuleInitializer]
-    public static void InitializeModule()
-    {
-        Debug.Assert(Marshal.SizeOf<jpeg_common_struct>() == 40); // 40 for x64
-        Debug.Assert(Marshal.SizeOf<jpeg_error_mgr>() == 168); // 164 absolute; 168 for x64 (Pack 8)
-        Debug.Assert(Marshal.SizeOf<jpeg_compress_struct>() == 504); // 504 for x64
-        //Debug.Assert(Marshal.SizeOf<jpeg_destination_mgr>() == 40); 
-        Debug.Assert(Marshal.SizeOf<jpeg_progress_mgr>() == 24);
-        Debug.Assert(Marshal.SizeOf<jpeg_memory_mgr>() == 96);
-    }
-#endif
-
     private readonly jpeg_common_ptr_delegate _errorExit;
     private readonly jpeg_emit_message_delegate _emitMessage;
     private readonly jpeg_output_message_delegate _outputMessage;
     private readonly jpeg_compress_ptr_delegate _initDestination;
     private readonly jpeg_compress_ptr_delegate _emptyOutputBuffer;
     private readonly jpeg_compress_ptr_delegate _termSestination;
-    private readonly jpeg_common_ptr_delegate _progressMonitor;
     
     private readonly JpegErrorMgr _errMgr = new();
     private readonly JpegCompressStruct _cinfo = new();
-    private readonly ManagedPtr<jpeg_progress_mgr> _progress = new();
-    private ManagedPtr<jpeg_destination_mgr>? _dest;
-    private ManagedPtr<jpeg_memory_mgr>? _memoryManager;
+    //private PtrOwner<jpeg_destination_mgr>? _dest;
+    //private PtrOwner<jpeg_memory_mgr>? _memoryManager;
 
     public LibJpegCompressor()
     {
@@ -43,12 +32,11 @@ internal sealed unsafe class LibJpegCompressor : IDisposable
         _initDestination = new(InitDestination);
         _emptyOutputBuffer = new(EmptyOutputBuffer);
         _termSestination = new(TermDestination);
-        _progressMonitor = new(ProgressMonitor);
+        //_progressMonitor = new(ProgressMonitor);
 
         _cinfo.Structure.err = _errMgr;
         //_cinfo.Structure.dest = _dest;
 
-        _progress.Save();
         _cinfo.Save();
     }
 
@@ -58,16 +46,16 @@ internal sealed unsafe class LibJpegCompressor : IDisposable
         _cinfo.Dispose();
     }
 
-    public unsafe void Compress(ReadOnlySpan<byte> inputImage, int width, int height, int stride, int channels, int quality, IBufferWriter<byte> output)
+    public void Compress(IntPtr scan0, int stride, int width, int height, int channels, J_COLOR_SPACE inColorSpace, int quality, IBufferWriter<byte> output)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(quality, 0);
+        ArgumentOutOfRangeException.ThrowIfNegative(quality);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(quality, 100);
 
         JpegStdError(_errMgr);
         SetErrCallbacks(_errMgr);
-        CompressCore(inputImage, quality, width, height, stride, channels, output);
+        CompressCore(scan0, stride, width, height, channels, inColorSpace, quality, output);
     }
 
     private static void JpegStdError(JpegErrorMgr errMgr)
@@ -82,15 +70,6 @@ internal sealed unsafe class LibJpegCompressor : IDisposable
            
         Debug.Assert(err.jpeg_message_table != default); // array of string messages
         Debug.Assert(err.last_jpeg_message == 129); // array size
-
-#if DEBUG
-        for (int i = 0; i < err.last_jpeg_message; i++)
-        {
-            IntPtr stringPtr = Marshal.ReadIntPtr(err.jpeg_message_table, i * IntPtr.Size); // Получаем указатель на текущую строку
-            var message = Marshal.PtrToStringAnsi(stringPtr);
-            Debug.WriteLine($"message_table[{i}]: {message}");
-        }
-#endif
     }
 
     public static IDisposable TurboCompress(byte[] data, int width, int height, int stride, int quality)
@@ -142,7 +121,7 @@ internal sealed unsafe class LibJpegCompressor : IDisposable
         errMgr.Save();
     }
 
-    private void SetDestCallbacks(ManagedPtr<jpeg_destination_mgr> dest)
+    private void SetDestCallbacks(PtrOwner<jpeg_destination_mgr> dest)
     {
         dest.Load();
 
@@ -153,164 +132,135 @@ internal sealed unsafe class LibJpegCompressor : IDisposable
         dest.Save();
     }
 
-    private void CompressCore(ReadOnlySpan<byte> inputImage, int quality, int width, int height, int stride, int channels, IBufferWriter<byte> output)
+    private void CompressCore(IntPtr scan0, int stride, int width, int height, int channels, J_COLOR_SPACE inColorSpace, int quality, IBufferWriter<byte> output)
     {
         var cinfo = _cinfo.Structure;
 
-        //cinfo.mem = DebugCreateUnmanaged<jpeg_memory_mgr>();
-        //cinfo.global_state = GlobalState.CSTATE_START;
-        //cinfo.comp_info = DebugCreateUnmanaged<jpeg_component_info>();
-        //cinfo.master = DebugCreateUnmanaged<jpeg_comp_master>();
-        //cinfo.scan_info = DebugCreateUnmanaged<jpeg_scan_info>();
-
         _cinfo.Save();
 
-        try
+        jpeg_CreateCompress(_cinfo, 62, (nuint)_cinfo.Size);
+
+        
+
+        var outbuffer = IntPtr.Zero;
+        uint initOutBufferSize = 8192;
+        jpeg_mem_dest(_cinfo, ref outbuffer, ref initOutBufferSize); // установит cinfo.dest если он null
+
+        _cinfo.Load();
+        var dest = PtrHolder.Create(cinfo.dest);
+
+        _cinfo.Load();
+        //_memoryManager = new((IntPtr)cinfo.mem);
+
+        cinfo.image_width = (uint)width;  /* image width and height, in pixels */
+        cinfo.image_height = (uint)height;
+        cinfo.input_components = channels;  // Number of color components per pixel. is 3 or 1 accordingly.
+        cinfo.in_color_space = inColorSpace; // colorspace of input image. JCS_RGB or JCS_GRAYSCALE. You must set in_color_space correctly before calling jpeg_set_defaults()
+        //cinfo.data_precision = 8;
+        //cinfo.raw_data_in = false;
+        //cinfo.optimize_coding = true;
+        //cinfo.progressive_mode = true;
+        _cinfo.Save();
+
+        jpeg_set_defaults(_cinfo);
+        _cinfo.Load();
+        _errMgr.ThrowIfError(_cinfo);
+
+        var comp_info = new PtrHolder<jpeg_component_info>(cinfo.comp_info);
+        // Default is no chroma subsampling.
+        comp_info.Structure.h_samp_factor = 1;
+        comp_info.Structure.v_samp_factor = 1;
+        comp_info.Save();
+
+        
+
+        //Span<byte> masterSpan = new Span<byte>(cinfo.master, 832);
+        //File.WriteAllBytes("D:\\master.bin", masterSpan.ToArray());
+
+        /* Make optional parameter settings here */
+        //jpeg_set_quality(_cinfo, quality, force_baseline: true);
+
+        //cinfo.optimize_coding = true;
+        //_cinfo.Save();
+        jpeg_simple_progression(_cinfo); // после set_defaults
+        
+        cinfo.optimize_coding = true;
+        _cinfo.Save();
+
+        _cinfo.Load();
+        var master = new PtrHolder<jpeg_comp_master>(cinfo.master);
+
+        fixed (bool* ptr = &master.Structure.force_baseline)
         {
-            jpeg_CreateCompress(_cinfo, 62, (nuint)_cinfo.Size);
-            //uint outBufferSize = 4096;
-            //Span<byte> outBuffer = new byte[outBufferSize];
-
-            //IntPtr outBufferPtr = IntPtr.Zero;
-            //uint initOutBufferSize = 256;
-            //IntPtr outBufferPtr = Marshal.AllocHGlobal((int)initOutBufferSize);
-
-
-
-            IntPtr unmanagedPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(IntPtr))); // (!) в ходе выполнения, jpeglib может изменить этот указатель.
-            var p = (IntPtr*)unmanagedPointer;
-            *p = IntPtr.Zero;
-
-            //byte* outBufferRef = (byte*)outBufferPtr; // (!) в ходе выполнения, jpeglib может изменить этот указатель.
-
-            var outbuffer = IntPtr.Zero;
-            uint initOutBufferSize = 8192;
-            jpeg_mem_dest(_cinfo, ref outbuffer, ref initOutBufferSize); // установит cinfo.dest если он null
-
-            //IntPtr initialOutBuffer = (IntPtr)outBufferRef;
-            //var s = initialOutBuffer.ToString("X");
-
-            //Span<byte> outBufferSpan = new((void*)outBufferPtr, (int)initOutBufferSize);
-
-            _cinfo.Load();
-            _dest = new((IntPtr)cinfo.dest);
-            //SetDestCallbacks(_dest);
-
-            //var outBufferSpan = new Span<byte>((void*)outBuffer, (int)outSize);
-
-            _cinfo.Load();
-            _memoryManager = new((IntPtr)cinfo.mem);
-
-            cinfo.image_width = (uint)width;  /* image width and height, in pixels */
-            cinfo.image_height = (uint)height;
-            cinfo.input_components = channels;	// Number of color components per pixel. is 3 or 1 accordingly.
-            cinfo.in_color_space = J_COLOR_SPACE.JCS_RGB; // colorspace of input image. JCS_RGB or JCS_GRAYSCALE. You must set in_color_space correctly before calling jpeg_set_defaults()
-            _cinfo.Save();
-
-            jpeg_set_defaults(_cinfo);
-            
-            /* Make optional parameter settings here */
-            jpeg_set_quality(_cinfo, quality, force_baseline: true);
-            
-            
-
-            jpeg_start_compress(_cinfo, write_all_tables: true);
-
-            _cinfo.Load();
-
-            
-
-
-            //var scanlineLen = (int)(cinfo.image_width * cinfo.input_components);
-            //var scanlinePtr = Marshal.AllocHGlobal(scanlineLen);
-            //scanlines[0] = scanlinePtr;
-
-            int row_stride;                 /* physical row width in buffer */
-            row_stride = (int)(cinfo.image_width * cinfo.input_components);
-
-            var scanlines = new byte[cinfo.image_height][];
-            var spanCursor = inputImage;
-            for (int i = 0; i < cinfo.image_height; i++)
-            {
-                var scanline = spanCursor[..row_stride];
-                spanCursor = spanCursor[row_stride..];
-                scanlines[i] = scanline.ToArray();
-            }
-
-            //for (int i = 0; i < cinfo.image_height; i++)
-            //while (cinfo.next_scanline < cinfo.image_height)
-            {
-                //var scanline = inputImage[(int)(cinfo.next_scanline * row_stride)..row_stride];
-
-                //Marshal.Copy(scanline.ToArray(), 0, scanlinePtr, scanline.Length);
-
-                //scanlines[0] = scanline.ToArray();
-                //scanlines[0] = scanlinePointer;
-
-                //row_pointer[0] = &raw_image[cinfo.next_scanline * cinfo.image_width * cinfo.input_components];
-                var scanlinesWritten = jpeg_write_scanlines(_cinfo, scanlines, scanlines.Length); // returns the number of scanlines actually written. This will normally be equal to the number passed in
-                Debug.Assert(scanlinesWritten == scanlines.Length);
-
-                _cinfo.Load();
-                _dest.Load();
-
-                uint outsize = *_dest.Structure.outsize;
-                Debug.Assert(outsize == initOutBufferSize);
-
-                byte* currentOutBuffer = _dest.Structure.buffer;
-                var bufSize = _dest.Structure.bufsize;
-                var totalWritten = bufSize - _dest.Structure.free_in_buffer;
-
-                //Debug.Assert((IntPtr)currentOutBuffer == initialOutBuffer);
-
-                var bufferSpan = new Span<byte>(currentOutBuffer, (int)totalWritten);
-                output.Write(bufferSpan);
-            }
-
-            ///* similar to read file, clean up after we're done compressing */
-            jpeg_finish_compress(_cinfo);
-            jpeg_destroy_compress(_cinfo);
+            Span<byte> span = new Span<byte>(ptr, 100);
         }
-        catch (Exception ex)
+
+        master.Structure.force_baseline = true;
+        master.Structure.xyb_mode = false;
+        master.Structure.cicp_transfer_function = 2; // unknown transfer function code
+        master.Structure.use_std_tables = false;
+        master.Structure.use_adaptive_quantization = true;
+        master.Structure.progressive_level = 2;
+        master.Structure.data_type = JpegliDataType.JPEGLI_TYPE_UINT8;
+        master.Structure.endianness = JpegliEndianness.JPEGLI_NATIVE_ENDIAN;
+        master.Structure.coeff_buffers = default;
+        master.Save();
+
+        jpeg_start_compress(_cinfo, write_all_tables: true);
+
+        master.Load();
+        //File.WriteAllBytes("D:\\master.bin", masterSpan.ToArray());
+
+        comp_info.Load();
+        _cinfo.Load();
+        //masterCopy.Load();
+
+        Span<IntPtr> scanlines = new IntPtr[height]; // TODO pool
+
+        for (int i = 0; i < height; i++)
         {
-            throw;
+            scanlines[i] = scan0 + (i * stride);
         }
+
+        //while (cinfo.next_scanline < cinfo.image_height)
+        //{
+        //    var ret = jpeg_write_scanlines(_cinfo, scanlines.Slice((int)cinfo.next_scanline, 1), 1);
+        //    _cinfo.Load();
+        //}
+
+        var scanlinesWritten = jpeg_write_scanlines(_cinfo, scanlines, scanlines.Length); // returns the number of scanlines actually written. This will normally be equal to the number passed in
+        if (scanlinesWritten != scanlines.Length)
+        {
+            throw new JpegLibException($"Something went wrong. Number of written scanlines is not equal to passed in number. Expected result: {scanlines.Length}. Actual result: {scanlinesWritten}");
+        }
+
+        Debug.Assert(scanlinesWritten == scanlines.Length);
+
+        //Debug.Assert((IntPtr)currentOutBuffer == initialOutBuffer);
+
+        ///* similar to read file, clean up after we're done compressing */
+        jpeg_finish_compress(_cinfo);
+
+        _cinfo.Load();
+        dest.Load();
+
+        uint outsize = *dest.Structure.outsize;
+        Debug.Assert(outsize == initOutBufferSize);
+
+        byte* currentOutBuffer = dest.Structure.buffer;
+        var bufSize = dest.Structure.bufsize;
+        var totalWritten = bufSize - dest.Structure.free_in_buffer;
+
+        var bufferSpan = new Span<byte>(currentOutBuffer, (int)totalWritten);
+        output.Write(bufferSpan);
+
+        jpeg_destroy_compress(_cinfo);
     }
 
-    private static T* DebugCreateUnmanaged<T>() where T : new()
-    {
-        var structure = new T();
-
-        var ptr = Marshal.AllocHGlobal(Marshal.SizeOf<T>()); // (!) do not forget to free
-        Marshal.StructureToPtr(structure, ptr, true);
-
-        return (T*)ptr;
-    }
-
-    private void ErrorExit(jpeg_common_struct* cinfo)
+    private void ErrorExit(IntPtr cinfo)
     {
         _cinfo.Load();
-        _errMgr.Load();
-
-        //Marshal.PtrToStructure((IntPtr)cinfo, _cinfo);
-        //Marshal.PtrToStructure((IntPtr)_cinfo.err, _errMgr);
-
-        Span<byte> messageBuffer = stackalloc byte[200];
-
-        fixed (byte* messageBufferPtr = messageBuffer)
-        {
-            _errMgr.Structure.format_message(cinfo, messageBufferPtr);
-        }
-
-        var nullTerminator = messageBuffer.IndexOf((byte)0);
-        if (nullTerminator != -1)
-        {
-            messageBuffer = messageBuffer[0..nullTerminator];
-        }
-
-        var message = Encoding.ASCII.GetString(messageBuffer);
-
-        throw new LibJpegException(message) { MsgCode = _errMgr.Structure.msg_code };
+        _errMgr.ThrowIfError(cinfo); // Не уверен что это безопасно бросать исключения сквозь маршалинг.
     }
 
     private void EmitMessage(IntPtr cinfo, int msg_level)

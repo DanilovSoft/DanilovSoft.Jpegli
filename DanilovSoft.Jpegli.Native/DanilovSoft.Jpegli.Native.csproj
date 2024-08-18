@@ -17,6 +17,9 @@
     <None Update="libjpeg\jpeg62.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="libjpeg\jxl_cms.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="libjpeg\libpng16.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -26,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Wrappers\" />
+    <Folder Include="ExtensionMethods\" />
   </ItemGroup>
 
 </Project>

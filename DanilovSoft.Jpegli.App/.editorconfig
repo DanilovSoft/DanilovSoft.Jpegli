@@ -1,0 +1,5 @@
+# Файлы C#
+[*.cs]
+
+# IDE0007: Использование неявного типа
+csharp_style_var_elsewhere = false
